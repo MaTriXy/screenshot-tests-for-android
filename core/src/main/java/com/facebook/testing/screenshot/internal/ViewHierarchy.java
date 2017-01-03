@@ -11,6 +11,7 @@ package com.facebook.testing.screenshot.internal;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
@@ -19,11 +20,17 @@ import javax.xml.transform.stream.StreamResult;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
+
+import com.facebook.testing.screenshot.plugin.PluginRegistry;
+import com.facebook.testing.screenshot.plugin.ViewDumpPlugin;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -45,6 +52,8 @@ public class ViewHierarchy {
       TransformerFactory transformerFactory = TransformerFactory.newInstance();
       Transformer transformer = transformerFactory.newTransformer();
       StreamResult result = new StreamResult(out);
+      transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+      transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
       transformer.transform(source, result);
     } catch (TransformerException e) {
       throw new RuntimeException(e);
@@ -81,6 +90,19 @@ public class ViewHierarchy {
     addTextNode(el, "top", String.valueOf(rect.top));
     addTextNode(el, "right", String.valueOf(rect.right));
     addTextNode(el, "bottom", String.valueOf(rect.bottom));
+    if (Build.VERSION.SDK_INT >= 11) {
+      addTextNode(el, "isLayoutRequested", String.valueOf(view.isLayoutRequested()));
+    }
+    addTextNode(el, "isDirty", String.valueOf(view.isDirty()));
+
+    Map<String, String> extraValues = new HashMap<>();
+    for (ViewDumpPlugin plugin : PluginRegistry.getPlugins()) {
+      plugin.dump(view, extraValues);
+    }
+
+    for (Map.Entry<String, String> extraValue : extraValues.entrySet()) {
+      addExtraValue(el, extraValue.getKey(), extraValue.getValue());
+    }
 
     Element children = doc.createElement("children");
     el.appendChild(children);
@@ -94,6 +116,13 @@ public class ViewHierarchy {
       }
     }
     return el;
+  }
+
+  private void addExtraValue(Element parent, String name, String value) {
+    Element elem = parent.getOwnerDocument().createElement("extra-value");
+    elem.setAttribute("key", name);
+    elem.setTextContent(value);
+    parent.appendChild(elem);
   }
 
   private void addTextNode(Element parent, String name, String value) {

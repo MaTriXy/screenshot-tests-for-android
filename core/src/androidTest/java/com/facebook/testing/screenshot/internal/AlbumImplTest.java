@@ -156,8 +156,7 @@ public class AlbumImplTest {
         .getElementsByTagName("view_hierarchy").item(0))
         .getTextContent();
 
-    assertNotNull(actual);
-    assertNotEquals("", actual);
+    assertEquals("foo_dump.xml", actual);
   }
 
   @Test
@@ -236,6 +235,25 @@ public class AlbumImplTest {
         .getTextContent());
   }
 
+  @Test
+  public void testSavesGroup() throws Throwable {
+    mAlbumImpl.addRecord(
+      new RecordBuilderImpl(null)
+      .setName("xyz")
+      .setTiling(Tiling.singleTile(mFooFile))
+      .setGroup("foo_bar"));
+
+    mAlbumImpl.flush();
+
+    Document document = parseMetadata();
+    assertEquals(
+      "foo_bar",
+      ((Element) ((Element) ((Element) document.getElementsByTagName("screenshots").item(0))
+        .getElementsByTagName("screenshot").item(0))
+        .getElementsByTagName("group").item(0))
+        .getTextContent());
+  }
+
   private Document parseMetadata() throws Throwable  {
     File file = mScreenshotDirectories.get("screenshots");
 
@@ -303,6 +321,12 @@ public class AlbumImplTest {
       fileNames.item(11).getTextContent());
 
     MoreAsserts.assertMatchesRegex(".*foo_1_0.png", fourthFile);
+
+    NodeList relativeFileNames = screenshot.getElementsByTagName("relative_file_name");
+
+    assertEquals(12, relativeFileNames.getLength());
+    String relativeFourthFile = relativeFileNames.item(4).getTextContent();
+    assertEquals("foo_1_0.png", relativeFourthFile);
   }
 
   @Test
@@ -327,5 +351,10 @@ public class AlbumImplTest {
     album.flush();
     verify(mHostFileSender).flush();
     album.cleanup();
+  }
+
+  @Test
+  public void testStoresRelativePathforTiles() throws Throwable {
+
   }
 }

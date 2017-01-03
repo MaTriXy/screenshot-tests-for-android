@@ -7,8 +7,7 @@
     <test_name>testGetTextViewScreenshot</test_name>
     <tile_width>1</tile_width>
     <tile_height>1</tile_height>
-    <relative_file_name>com.foo.ScriptsFixtureTest_testGetTextViewScreenshot.png</relative_file_name>
-    <view_hierarchy>one_dump.xml</view_hierarchy>
+    <absolute_file_name>/sdcard/screenshots/com.foo/screenshots-default/com.foo.ScriptsFixtureTest_testGetTextViewScreenshot.png</absolute_file_name>
   </screenshot>
   <screenshot>
     <description />
@@ -18,14 +17,6 @@
     <test_name>testSecondScreenshot</test_name>
     <tile_width>1</tile_width>
     <tile_height>1</tile_height>
-    <relative_file_name>com.foo.ScriptsFixtureTest_testSecondScreenshot.png</relative_file_name>
-  </screenshot>
-  <screenshot>
-    <description/>
-    <!-- the '.' makes wkhtmlimage think this is an external url -->
-    <name>com.facebook.something.FooBar2.png</name>
-    <test_name>unknown</test_name>
-    <test_class>unknown</test_class>
-    <error>Outofmem and such</error>
+    <absolute_file_name>/sdcard/screenshots/com.foo/screenshots-default/com.foo.ScriptsFixtureTest_testSecondScreenshot.png</absolute_file_name>
   </screenshot>
 </screenshots>

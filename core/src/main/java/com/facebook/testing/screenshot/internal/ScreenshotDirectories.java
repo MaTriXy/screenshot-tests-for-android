@@ -10,6 +10,8 @@
 package com.facebook.testing.screenshot.internal;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Environment;
 
 import java.io.File;
@@ -25,14 +27,32 @@ class ScreenshotDirectories {
   }
 
   public File get(String type) {
+    checkPermissions();
     return getSdcardDir(type);
   }
 
+  private void checkPermissions() {
+    int res = mContext.checkCallingOrSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE");
+    if (res != PackageManager.PERMISSION_GRANTED) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        throw new RuntimeException("This does not currently work on API 23+, see "
+            + "https://github.com/facebook/screenshot-tests-for-android/issues/16 for details.");
+      } else {
+        throw new RuntimeException("We need WRITE_EXTERNAL_STORAGE permission for screenshot tests");
+      }
+    }
+  }
+
   private File getSdcardDir(String type) {
+    String externalStorage = System.getenv("EXTERNAL_STORAGE");
+
+    if (externalStorage == null) {
+      throw new RuntimeException("No $EXTERNAL_STORAGE has been set on the device, please report this bug!");
+    }
 
     String parent = String.format(
-      "%sscreenshots/%s/",
-      Environment.getExternalStorageDirectory().getPath(),
+      "%s/screenshots/%s/",
+      externalStorage,
       mContext.getPackageName());
 
     String child = String.format("%s/screenshots-%s", parent, type);
@@ -43,7 +63,7 @@ class ScreenshotDirectories {
     dir.mkdir();
 
     if (!dir.exists()) {
-      throw new RuntimeException("Failed to create the directory for screenshots, do you have WRITE_EXTERNAL_STORAGE permission?");
+      throw new RuntimeException("Failed to create the directory for screenshots. Is your sdcard directory read-only?");
     }
 
     setWorldWriteable(dir);
