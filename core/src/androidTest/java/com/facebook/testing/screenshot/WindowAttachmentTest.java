@@ -1,13 +1,22 @@
-/**
- * Copyright (c) 2014-present, Facebook, Inc.
- * All rights reserved.
+/*
+ * Copyright 2014-present Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 package com.facebook.testing.screenshot;
+
+import static android.support.test.espresso.action.ViewActions.*;
+import static android.support.test.espresso.matcher.ViewMatchers.*;
 
 import android.app.KeyguardManager;
 import android.content.Context;
@@ -17,18 +26,12 @@ import android.support.test.runner.AndroidJUnit4;
 import android.test.ActivityInstrumentationTestCase2;
 import android.view.View;
 import android.widget.LinearLayout;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import static android.support.test.espresso.action.ViewActions.*;
-import static android.support.test.espresso.matcher.ViewMatchers.*;
-import static org.junit.Assert.*;
 
-/**
- * Tests {@link WindowAttachment}
- */
+/** Tests {@link WindowAttachment} */
 @RunWith(AndroidJUnit4.class)
 public class WindowAttachmentTest extends ActivityInstrumentationTestCase2<MyActivity> {
 
@@ -46,8 +49,9 @@ public class WindowAttachmentTest extends ActivityInstrumentationTestCase2<MyAct
     mContext = InstrumentationRegistry.getTargetContext();
     injectInstrumentation(InstrumentationRegistry.getInstrumentation());
     super.setUp();
-    KeyguardManager km = (KeyguardManager)
-      getInstrumentation().getTargetContext().getSystemService(Context.KEYGUARD_SERVICE);
+    KeyguardManager km =
+        (KeyguardManager)
+            getInstrumentation().getTargetContext().getSystemService(Context.KEYGUARD_SERVICE);
     mLock = km.newKeyguardLock("SelectAtTagActivityTest");
     mLock.disableKeyguard();
   }
@@ -99,19 +103,20 @@ public class WindowAttachmentTest extends ActivityInstrumentationTestCase2<MyAct
     final View[] view = new View[1];
 
     getActivity();
-    InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
-        @Override
-        public void run() {
-          view[0] = new MyView(getActivity());
-          getActivity().setContentView(view[0]);
-        }
-      });
+    InstrumentationRegistry.getInstrumentation()
+        .runOnMainSync(
+            new Runnable() {
+              @Override
+              public void run() {
+                view[0] = new MyView(getActivity());
+                getActivity().setContentView(view[0]);
+              }
+            });
 
     InstrumentationRegistry.getInstrumentation().waitForIdleSync();
 
     // Call some espress method to make sure we're ready:
-    Espresso.onView(withId(android.R.id.content))
-      .perform(click());
+    Espresso.onView(withId(android.R.id.content)).perform(click());
 
     mAttachedCalled = 0;
     mDetachedCalled = 0;
@@ -126,16 +131,17 @@ public class WindowAttachmentTest extends ActivityInstrumentationTestCase2<MyAct
   @Test
   public void testSetAttachInfo() throws Throwable {
     final MyView view = new MyView(mContext);
-    InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
-        @Override
-        public void run() {
-          WindowAttachment.setAttachInfo(view);
-        }
-      });
+    InstrumentationRegistry.getInstrumentation()
+        .runOnMainSync(
+            new Runnable() {
+              @Override
+              public void run() {
+                WindowAttachment.setAttachInfo(view);
+              }
+            });
 
     assertNotNull(view.getWindowToken());
   }
-
 
   public class MyView extends View {
     public MyView(Context context) {
@@ -172,5 +178,4 @@ public class WindowAttachmentTest extends ActivityInstrumentationTestCase2<MyAct
       mDetachedCalled++;
     }
   }
-
 }

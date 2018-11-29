@@ -1,14 +1,25 @@
-/**
- * Copyright (c) 2014-present, Facebook, Inc.
- * All rights reserved.
+/*
+ * Copyright 2014-present Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 package com.facebook.testing.screenshot.internal;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Xml;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -16,42 +27,33 @@ import java.io.OutputStream;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.util.Xml;
-
+import javax.annotation.Nullable;
 import org.xmlpull.v1.XmlSerializer;
 
-/**
- * A "local" implementation of Album.
- */
+/** A "local" implementation of Album. */
 @SuppressWarnings("deprecation")
 public class AlbumImpl implements Album {
   private static final int COMPRESSION_QUALITY = 90;
 
   private final File mDir;
-  private final Set<String> mAllNames = new HashSet<String>();
-  private int mTempFileNameCounter = 0;
+  private final Set<String> mAllNames = new HashSet<>();
   private XmlSerializer mXmlSerializer;
   private FileOutputStream mOutputStream;
-  private HostFileSender mHostFileSender;
 
   /* VisibleForTesting */
-  AlbumImpl(ScreenshotDirectories screenshotDirectories, String name, HostFileSender hostFileSender) {
+  AlbumImpl(ScreenshotDirectories screenshotDirectories, String name) {
     mDir = screenshotDirectories.get(name);
-    mHostFileSender = hostFileSender;
+  }
+
+  /** Creates a "local" album that stores all the images on device. */
+  public static AlbumImpl create(Context context, String name) {
+    return new AlbumImpl(new ScreenshotDirectories(context), name);
   }
 
   @Override
   public void flush() {
     if (mOutputStream != null) {
       endXml();
-    }
-
-    if (mHostFileSender != null) {
-      mHostFileSender.flush();
     }
   }
 
@@ -71,15 +73,12 @@ public class AlbumImpl implements Album {
     }
   }
 
+  @SuppressLint("SetWorldReadable")
   private void endXml() {
     try {
       mXmlSerializer.endTag(null, "screenshots");
       mXmlSerializer.endDocument();
       mXmlSerializer.flush();
-
-      if (!getMetadataFile().setReadable(/* readable = */ true, /* ownerOnly = */false)) {
-        //        throw new RuntimeException("Could not set permission on the screenshot metadata file");
-      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -91,11 +90,9 @@ public class AlbumImpl implements Album {
     }
   }
 
-  /**
-   * Returns the stored screenshot in the album, or null if no such
-   * test case exists.
-   */
-  /* package private */ Bitmap getScreenshot(String name) {
+  /** Returns the stored screenshot in the album, or null if no such test case exists. */
+  @Nullable
+  Bitmap getScreenshot(String name) {
     if (getScreenshotFile(name) == null) {
       return null;
     }
@@ -103,20 +100,18 @@ public class AlbumImpl implements Album {
   }
 
   /**
-   * Returns the file in which the screenshot is stored, or null if
-   * this is not a valid screenshot
+   * Returns the file in which the screenshot is stored, or null if this is not a valid screenshot
    */
-  /* package private */ File getScreenshotFile(String name) {
-    if (mHostFileSender != null) {
-      throw new UnsupportedOperationException("Cannot be called with HostFileSender");
-    }
+  @Nullable
+  File getScreenshotFile(String name) {
     File file = getScreenshotFileInternal(name);
-    if (!file.exists()) {
+    if (!file.isFile()) {
       return null;
     }
     return file;
   }
 
+  @SuppressLint("SetWorldReadable")
   @Override
   public String writeBitmap(String name, int tilei, int tilej, Bitmap bitmap) throws IOException {
     String tileName = generateTileName(name, tilei, tilej);
@@ -125,16 +120,11 @@ public class AlbumImpl implements Album {
     outputStream = new FileOutputStream(file);
     bitmap.compress(Bitmap.CompressFormat.PNG, COMPRESSION_QUALITY, outputStream);
     outputStream.close();
-    file.setReadable(/* readable = */ true, /* ownerOnly = */false);
-    if (mHostFileSender != null) {
-      mHostFileSender.send(file);
-    }
+    file.setReadable(/* readable = */ true, /* ownerOnly = */ false);
     return tileName;
   }
 
-  /**
-   * Delete all screenshots associated with this album
-   */
+  /** Delete all screenshots associated with this album */
   @Override
   public void cleanup() {
     if (!mDir.exists()) {
@@ -147,18 +137,15 @@ public class AlbumImpl implements Album {
   }
 
   /**
-   * Same as the public getScreenshotFile() except it returns the File
-   * even if the screenshot doesn't exist.
+   * Same as the public getScreenshotFile() except it returns the File even if the screenshot
+   * doesn't exist.
    */
   private File getScreenshotFileInternal(String name) {
-    String fileName = name + ".png";
-    File file = new File(mDir, fileName);
-    return file;
+    return new File(mDir, name + ".png");
   }
 
   private File getViewHierarchyFile(String name) {
-    String fileName = name + "_dump.xml";
-    return new File(mDir, fileName);
+    return new File(mDir, name + "_dump.json");
   }
 
   @Override
@@ -170,21 +157,23 @@ public class AlbumImpl implements Album {
   }
 
   /**
-   * Add the given record to the album. This is called by
-   * RecordBuilderImpl#record() and so is an internal detail.
+   * Add the given record to the album. This is called by RecordBuilderImpl#record() and so is an
+   * internal detail.
    */
+  @SuppressLint("SetWorldReadable")
   @Override
   public void addRecord(RecordBuilderImpl recordBuilder) throws IOException {
     initXml();
     recordBuilder.checkState();
     if (mAllNames.contains(recordBuilder.getName())) {
       if (recordBuilder.hasExplicitName()) {
-        throw new AssertionError("Can't create multiple screenshots with the same name: "
-                                 + recordBuilder.getName());
-      } else {
-        throw new AssertionError("Can't create multiple screenshots from the same test, or " +
-                                 "use .setName() to name each screenshot differently");
+        throw new AssertionError(
+            "Can't create multiple screenshots with the same name: " + recordBuilder.getName());
       }
+
+      throw new AssertionError(
+          "Can't create multiple screenshots from the same test, or "
+              + "use .setName() to name each screenshot differently");
     }
 
     mXmlSerializer.startTag(null, "screenshot");
@@ -200,7 +189,7 @@ public class AlbumImpl implements Album {
 
     if (viewHierarchy.exists()) {
       addTextNode("view_hierarchy", getRelativePath(viewHierarchy, mDir));
-      viewHierarchy.setReadable(/* readable = */ true, /* ownerOnly = */false);
+      viewHierarchy.setReadable(/* readable = */ true, /* ownerOnly = */ false);
     }
 
     mXmlSerializer.startTag(null, "extras");
@@ -229,26 +218,19 @@ public class AlbumImpl implements Album {
     Tiling tiling = recordBuilder.getTiling();
     for (int i = 0; i < tiling.getWidth(); i++) {
       for (int j = 0; j < tiling.getHeight(); j++) {
-        File file = getScreenshotFileInternal(tiling.getAt(i,j));
+        File file = getScreenshotFileInternal(tiling.getAt(i, j));
 
-        if (!file.exists() && mHostFileSender == null) {
+        if (!file.isFile()) {
           throw new RuntimeException("The tile file doesn't exist");
         }
 
-        addTextNode(
-          "absolute_file_name",
-          file.getAbsolutePath());
-
-        addTextNode(
-          "relative_file_name",
-          getRelativePath(file, mDir));
+        addTextNode("absolute_file_name", file.getAbsolutePath());
+        addTextNode("relative_file_name", getRelativePath(file, mDir));
       }
     }
   }
 
-  /**
-   * Returns the relative path of file from dir
-   */
+  /** Returns the relative path of file from dir */
   private String getRelativePath(File file, File dir) {
     try {
       String filePath = file.getCanonicalPath();
@@ -277,11 +259,11 @@ public class AlbumImpl implements Album {
   }
 
   /**
-   * For a given screenshot, and a tile position, generates a name
-   * where we store the screenshot in the album.
+   * For a given screenshot, and a tile position, generates a name where we store the screenshot in
+   * the album.
    *
-   * For backward compatibility with existing screenshot scripts, for
-   * the tile (0, 0) we use the name directly.
+   * <p>For backward compatibility with existing screenshot scripts, for the tile (0, 0) we use the
+   * name directly.
    */
   private String generateTileName(String name, int i, int j) {
     if (i == 0 && j == 0) {
@@ -289,24 +271,5 @@ public class AlbumImpl implements Album {
     }
 
     return String.format("%s_%s_%s", name, String.valueOf(i), String.valueOf(j));
-  }
-
-  /**
-   * Creates a "local" album that stores all the images on the local
-   * disk.
-   */
-  public static AlbumImpl createLocal(Context context, String name) {
-    return new AlbumImpl(new ScreenshotDirectories(context), name, null);
-  }
-
-  /**
-   * Creates an album that streams the images as they are created onto
-   * the host machine.
-   */
-  public static AlbumImpl createStreaming(
-      Context context,
-      String name,
-      HostFileSender hostFileSender) {
-    return new AlbumImpl(new ScreenshotDirectories(context), name, hostFileSender);
   }
 }
