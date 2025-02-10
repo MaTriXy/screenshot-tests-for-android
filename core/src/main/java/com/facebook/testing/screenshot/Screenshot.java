@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot;
 
 import android.app.Activity;
 import android.view.View;
+import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.testing.screenshot.internal.ScreenshotImpl;
 
 /**
@@ -27,6 +29,7 @@ import com.facebook.testing.screenshot.internal.ScreenshotImpl;
  * <p>Eventually we can use this to catch rendering changes, with very little work added to the
  * instrumentation test.
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class Screenshot {
   /**
    * Take a snapshot of an already measured and layout-ed view. See adb-logcat for how to pull the
@@ -46,5 +49,12 @@ public class Screenshot {
    */
   public static RecordBuilder snapActivity(Activity activity) {
     return ScreenshotImpl.getInstance().snapActivity(activity);
+  }
+
+  /**
+   * @return The largest amount of pixels we'll capture, otherwise an exception will be thrown.
+   */
+  public static long getMaxPixels() {
+    return ScreenshotImpl.getMaxPixels();
   }
 }

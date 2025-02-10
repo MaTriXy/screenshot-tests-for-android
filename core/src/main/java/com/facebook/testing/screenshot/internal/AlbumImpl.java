@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,36 +13,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
+
+import static com.facebook.testing.screenshot.ScreenshotRunner.SCREENSHOT_TESTS_RUN_ID;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.util.Xml;
+import android.util.Log;
+import androidx.annotation.VisibleForTesting;
+import com.facebook.infer.annotation.Nullsafe;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.xmlpull.v1.XmlSerializer;
 
 /** A "local" implementation of Album. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 @SuppressWarnings("deprecation")
 public class AlbumImpl implements Album {
   private static final int COMPRESSION_QUALITY = 90;
+  private static final String SCREENSHOT_TESTS_RUN_ID_FILE_NAME = "tests_run_id";
 
   private final File mDir;
   private final Set<String> mAllNames = new HashSet<>();
-  private XmlSerializer mXmlSerializer;
-  private FileOutputStream mOutputStream;
+  private final MetadataRecorder mMetadataRecorder;
+  private final ReportArtifactsManager mReportArtifactsManager;
+  private String mPreviousTestRunId;
+  private String mCurrentTestRunId;
 
   /* VisibleForTesting */
   AlbumImpl(ScreenshotDirectories screenshotDirectories, String name) {
     mDir = screenshotDirectories.get(name);
+    // NULLSAFE_FIXME[Field Not Nullable]
+    mPreviousTestRunId = readPreviousTestRunId();
+    mCurrentTestRunId = getCurrentTestRunId();
+    mMetadataRecorder = new MetadataRecorder(mDir);
+    mReportArtifactsManager = new ReportArtifactsManager(mCurrentTestRunId, mDir);
   }
 
   /** Creates a "local" album that stores all the images on device. */
@@ -52,47 +66,38 @@ public class AlbumImpl implements Album {
 
   @Override
   public void flush() {
-    if (mOutputStream != null) {
-      endXml();
+    mMetadataRecorder.flush();
+    writePreviousTestRunId();
+  }
+
+  @Nullable
+  private String readPreviousTestRunId() {
+    try {
+      BufferedReader reader =
+          new BufferedReader(new FileReader(new File(mDir, SCREENSHOT_TESTS_RUN_ID_FILE_NAME)));
+      return reader.readLine();
+    } catch (IOException e) {
+      return null;
     }
   }
 
-  private void initXml() {
-    if (mOutputStream != null) {
-      return;
-    }
-
+  private void writePreviousTestRunId() {
     try {
-      mOutputStream = new FileOutputStream(getMetadataFile());
-      mXmlSerializer = Xml.newSerializer();
-      mXmlSerializer.setOutput(mOutputStream, "utf-8");
-      mXmlSerializer.startDocument("utf-8", null);
-      mXmlSerializer.startTag(null, "screenshots");
+      FileWriter writer = new FileWriter(new File(mDir, SCREENSHOT_TESTS_RUN_ID_FILE_NAME));
+      writer.write(mCurrentTestRunId);
+      writer.close();
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      Log.e(AlbumImpl.class.getName(), "Couldn't write previous test run id.", e);
     }
   }
 
-  @SuppressLint("SetWorldReadable")
-  private void endXml() {
-    try {
-      mXmlSerializer.endTag(null, "screenshots");
-      mXmlSerializer.endDocument();
-      mXmlSerializer.flush();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
-    try {
-      mOutputStream.close();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+  private String getCurrentTestRunId() {
+    return Registry.getRegistry().arguments.getString(SCREENSHOT_TESTS_RUN_ID, "");
   }
 
   /** Returns the stored screenshot in the album, or null if no such test case exists. */
   @Nullable
-  Bitmap getScreenshot(String name) {
+  Bitmap getScreenshot(String name) throws IOException {
     if (getScreenshotFile(name) == null) {
       return null;
     }
@@ -101,36 +106,36 @@ public class AlbumImpl implements Album {
 
   /**
    * Returns the file in which the screenshot is stored, or null if this is not a valid screenshot
+   *
+   * <p>TODO: Adjust tests to no longer use this method. It's quite sketchy and inefficient.
    */
   @Nullable
   File getScreenshotFile(String name) {
-    File file = getScreenshotFileInternal(name);
-    if (!file.isFile()) {
-      return null;
-    }
-    return file;
+    return mReportArtifactsManager.readFile(getScreenshotFilenameInternal(name));
   }
 
-  @SuppressLint("SetWorldReadable")
   @Override
   public String writeBitmap(String name, int tilei, int tilej, Bitmap bitmap) throws IOException {
     String tileName = generateTileName(name, tilei, tilej);
-    File file = getScreenshotFileInternal(tileName);
-    FileOutputStream outputStream;
-    outputStream = new FileOutputStream(file);
-    bitmap.compress(Bitmap.CompressFormat.PNG, COMPRESSION_QUALITY, outputStream);
-    outputStream.close();
-    file.setReadable(/* readable = */ true, /* ownerOnly = */ false);
+    String filename = getScreenshotFilenameInternal(tileName);
+    ByteArrayOutputStream os = new ByteArrayOutputStream();
+    bitmap.compress(Bitmap.CompressFormat.PNG, COMPRESSION_QUALITY, os);
+    mReportArtifactsManager.recordFile(filename, os.toByteArray());
     return tileName;
   }
 
   /** Delete all screenshots associated with this album */
   @Override
   public void cleanup() {
+    if (mCurrentTestRunId.equals(mPreviousTestRunId)) {
+      // AlbumImpl instance was recreated because of ORCHESTRATOR
+      return;
+    }
     if (!mDir.exists()) {
       // We probably failed to even create it, so nothing to clean up
       return;
     }
+    // NULLSAFE_FIXME[Nullable Dereference]
     for (String s : mDir.list()) {
       new File(mDir, s).delete();
     }
@@ -140,20 +145,31 @@ public class AlbumImpl implements Album {
    * Same as the public getScreenshotFile() except it returns the File even if the screenshot
    * doesn't exist.
    */
-  private File getScreenshotFileInternal(String name) {
-    return new File(mDir, name + ".png");
+  private static String getScreenshotFilenameInternal(String name) {
+    return name + ".png";
   }
 
-  private File getViewHierarchyFile(String name) {
-    return new File(mDir, name + "_dump.json");
+  private static String getViewHierarchyFilename(String name) {
+    return name + "_dump.json";
+  }
+
+  private static String getAxIssuesFilename(String name) {
+    return name + "_issues.json";
   }
 
   @Override
-  public OutputStream openViewHierarchyFile(String name) throws IOException {
-    File file = getViewHierarchyFile(name);
-    OutputStream os = new FileOutputStream(file);
-    os.flush();
-    return os;
+  public void writeAxIssuesFile(String name, String data) throws IOException {
+    writeMetadataFile(getAxIssuesFilename(name), data);
+  }
+
+  @Override
+  public void writeViewHierarchyFile(String name, String data) throws IOException {
+    writeMetadataFile(getViewHierarchyFilename(name), data);
+  }
+
+  public void writeMetadataFile(String name, String data) throws IOException {
+    byte[] out = data.getBytes();
+    mReportArtifactsManager.recordFile(name, out);
   }
 
   /**
@@ -163,7 +179,6 @@ public class AlbumImpl implements Album {
   @SuppressLint("SetWorldReadable")
   @Override
   public void addRecord(RecordBuilderImpl recordBuilder) throws IOException {
-    initXml();
     recordBuilder.checkState();
     if (mAllNames.contains(recordBuilder.getName())) {
       if (recordBuilder.hasExplicitName()) {
@@ -176,56 +191,52 @@ public class AlbumImpl implements Album {
               + "use .setName() to name each screenshot differently");
     }
 
-    mXmlSerializer.startTag(null, "screenshot");
     Tiling tiling = recordBuilder.getTiling();
-    addTextNode("description", recordBuilder.getDescription());
-    addTextNode("name", recordBuilder.getName());
-    addTextNode("test_class", recordBuilder.getTestClass());
-    addTextNode("test_name", recordBuilder.getTestName());
-    addTextNode("tile_width", String.valueOf(tiling.getWidth()));
-    addTextNode("tile_height", String.valueOf(tiling.getHeight()));
 
-    File viewHierarchy = getViewHierarchyFile(recordBuilder.getName());
-
-    if (viewHierarchy.exists()) {
-      addTextNode("view_hierarchy", getRelativePath(viewHierarchy, mDir));
-      viewHierarchy.setReadable(/* readable = */ true, /* ownerOnly = */ false);
-    }
-
-    mXmlSerializer.startTag(null, "extras");
-    for (Map.Entry<String, String> entry : recordBuilder.getExtras().entrySet()) {
-      addTextNode(entry.getKey(), entry.getValue());
-    }
-    mXmlSerializer.endTag(null, "extras");
+    MetadataRecorder.ScreenshotMetadataRecorder screenshotNode =
+        mMetadataRecorder
+            .addNewScreenshot()
+            .withDescription(recordBuilder.getDescription())
+            .withName(recordBuilder.getName())
+            .withTestClass(recordBuilder.getTestClass())
+            .withTestName(recordBuilder.getTestName())
+            .withTileWidth(tiling.getWidth())
+            .withTileHeight(tiling.getHeight())
+            .withViewHierarchy(getViewHierarchyFilename(recordBuilder.getName()))
+            .withAxIssues(getAxIssuesFilename(recordBuilder.getName()))
+            .withExtras(recordBuilder.getExtras());
 
     if (recordBuilder.getError() != null) {
-      addTextNode("error", recordBuilder.getError());
+      screenshotNode.withError(recordBuilder.getError());
     } else {
-      saveTiling(recordBuilder);
+      saveTiling(screenshotNode, recordBuilder);
     }
 
     if (recordBuilder.getGroup() != null) {
-      addTextNode("group", recordBuilder.getGroup());
+      screenshotNode.withGroup(recordBuilder.getGroup());
     }
 
     mAllNames.add(recordBuilder.getName());
 
-    mXmlSerializer.endTag(null, "screenshot");
-    mXmlSerializer.flush();
+    screenshotNode.save();
   }
 
-  private void saveTiling(RecordBuilderImpl recordBuilder) throws IOException {
+  @VisibleForTesting
+  File getMetadataFile() {
+    return mMetadataRecorder.getMetadataFile();
+  }
+
+  private void saveTiling(
+      MetadataRecorder.ScreenshotMetadataRecorder recorder, RecordBuilderImpl recordBuilder)
+      throws IOException {
     Tiling tiling = recordBuilder.getTiling();
     for (int i = 0; i < tiling.getWidth(); i++) {
       for (int j = 0; j < tiling.getHeight(); j++) {
-        File file = getScreenshotFileInternal(tiling.getAt(i, j));
+        File file = new File(mDir, generateTileName(recordBuilder.getName(), i, j));
 
-        if (!file.isFile()) {
-          throw new RuntimeException("The tile file doesn't exist");
-        }
-
-        addTextNode("absolute_file_name", file.getAbsolutePath());
-        addTextNode("relative_file_name", getRelativePath(file, mDir));
+        recorder
+            .withAbsoluteFileName(file.getAbsolutePath())
+            .withRelativeFileName(getRelativePath(file, mDir));
       }
     }
   }
@@ -244,18 +255,6 @@ public class AlbumImpl implements Album {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private void addTextNode(String name, String value) throws IOException {
-    mXmlSerializer.startTag(null, name);
-    if (value != null) {
-      mXmlSerializer.text(value);
-    }
-    mXmlSerializer.endTag(null, name);
-  }
-
-  public File getMetadataFile() {
-    return new File(mDir, "metadata.xml");
   }
 
   /**

@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
+import com.facebook.infer.annotation.Nullsafe;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import javax.annotation.Nullable;
-import junit.framework.TestCase;
 
 /** Detect the test name and class that is being run currently. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class TestNameDetector {
+  private static final String JUNIT_TEST_CASE = "junit.framework.TestCase";
   private static final String JUNIT_RUN_WITH = "org.junit.runner.RunWith";
   private static final String JUNIT_TEST = "org.junit.Test";
   private static final String UNKNOWN = "unknown";
@@ -76,9 +79,9 @@ public class TestNameDetector {
     return null;
   }
 
-  private static boolean isTestClass(Class<?> clazz) {
+  private static boolean isTestClass(@Nullable Class<?> clazz) {
     return clazz != null
-        && (clazz.equals(TestCase.class)
+        && (JUNIT_TEST_CASE.equals(clazz.getCanonicalName())
             || hasAnnotation(clazz.getAnnotations(), JUNIT_RUN_WITH)
             || isTestClass(clazz.getSuperclass()));
   }

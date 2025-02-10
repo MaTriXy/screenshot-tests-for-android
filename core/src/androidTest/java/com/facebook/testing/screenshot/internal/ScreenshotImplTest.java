@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
 import static org.junit.Assert.assertEquals;
@@ -26,20 +27,20 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.support.test.InstrumentationRegistry;
-import android.support.test.filters.SdkSuppress;
-import android.support.test.runner.AndroidJUnit4;
-import android.test.MoreAsserts;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.SdkSuppress;
+import androidx.test.runner.AndroidJUnit4;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Locale;
+import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -107,6 +108,7 @@ public class ScreenshotImplTest {
     String fileName =
         new File(mScreenshotDirectories.get("verify-in-test"), "blahblah_dump.json")
             .getAbsolutePath();
+
     InputStream is = new FileInputStream(fileName);
 
     StringBuilder builder = new StringBuilder();
@@ -115,21 +117,21 @@ public class ScreenshotImplTest {
     while ((read = is.read(buffer)) != -1) {
       builder.append(new String(buffer, 0, read));
     }
+    JSONObject result = new JSONObject(builder.toString());
 
-    String expected =
-        "{"
-            + "  \"class\": \"android.widget.TextView\","
-            + "  \"left\": 0,"
-            + "  \"top\": 0,"
-            + "  \"width\": 200,"
-            + "  \"height\": 100"
-            + "}";
-    assertEquals(expected, builder.toString().replace("\n", ""));
+    assertEquals(3, result.length());
+    JSONObject viewHierarchy = result.getJSONObject("viewHierarchy");
+    assertEquals(5, viewHierarchy.length());
+    assertEquals("android.widget.TextView", viewHierarchy.getString("class"));
+    assertEquals(0, viewHierarchy.getInt("left"));
+    assertEquals(0, viewHierarchy.getInt("top"));
+    assertEquals(200, viewHierarchy.getInt("width"));
+    assertEquals(100, viewHierarchy.getInt("height"));
 
     File metadata = mAlbumImpl.getMetadataFile();
     String metadataContents = fileToString(metadata);
 
-    MoreAsserts.assertContainsRegex("blahblah.*.json", metadataContents);
+    OldApiBandaid.assertContainsRegex("blahblah.*.json", metadataContents);
   }
 
   @Test
@@ -142,7 +144,7 @@ public class ScreenshotImplTest {
       mScreenshot.snap(mTextView).setName("largeView").record();
       fail("expected exception");
     } catch (RuntimeException e) {
-      MoreAsserts.assertContainsRegex(".*View too large.*", e.getMessage());
+      OldApiBandaid.assertContainsRegex(".*View too large.*", e.getMessage());
     }
   }
 
@@ -276,7 +278,7 @@ public class ScreenshotImplTest {
       rb.getBitmap();
       fail("expected exception");
     } catch (IllegalArgumentException e) {
-      MoreAsserts.assertMatchesRegex(".*after.*record.*", e.getMessage());
+      OldApiBandaid.assertMatchesRegex(".*after.*record.*", e.getMessage());
     }
   }
 

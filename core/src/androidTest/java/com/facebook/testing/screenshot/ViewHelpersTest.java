@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,25 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.assertEquals;
 
-import android.test.InstrumentationTestCase;
+import android.content.Context;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import androidx.test.InstrumentationRegistry;
 import com.facebook.testing.screenshot.test.R;
+import org.junit.Before;
 
 /** Tests {@link ViewHelpers} */
-public class ViewHelpersTest extends InstrumentationTestCase {
+public class ViewHelpersTest {
   private TextView mTextView;
+  private Context targetContext;
 
-  @Override
+  @Before
   public void setUp() throws Exception {
-    super.setUp();
-    mTextView = new TextView(getInstrumentation().getTargetContext());
+    targetContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    mTextView = new TextView(targetContext);
     mTextView.setText("foobar");
   }
 
@@ -72,11 +77,10 @@ public class ViewHelpersTest extends InstrumentationTestCase {
   }
 
   public void testListViewHeight() throws Throwable {
-    ListView view = new ListView(getInstrumentation().getTargetContext());
+    ListView view = new ListView(targetContext);
     view.setDividerHeight(0);
     ArrayAdapter<String> adapter =
-        new ArrayAdapter<String>(
-            getInstrumentation().getTargetContext(), R.layout.testing_simple_textview);
+        new ArrayAdapter<String>(targetContext, R.layout.testing_simple_textview);
     view.setAdapter(adapter);
 
     for (int i = 0; i < 20; i++) {
@@ -89,5 +93,15 @@ public class ViewHelpersTest extends InstrumentationTestCase {
 
     int oneHeight = view.getChildAt(0).getMeasuredHeight();
     assertThat(view.getMeasuredHeight(), equalTo(oneHeight * 20));
+  }
+
+  public void testMaxHeightLessThanHeight() throws Throwable {
+    ViewHelpers.setupView(mTextView).setMaxHeightPx(100).layout();
+    assertThat(mTextView.getMeasuredHeight(), lessThan(100));
+  }
+
+  public void testMaxHeightUsesFullHeight() throws Throwable {
+    ViewHelpers.setupView(mTextView).setMaxHeightPx(1).layout();
+    assertThat(mTextView.getMeasuredHeight(), equalTo(1));
   }
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
 import android.annotation.TargetApi;
@@ -26,15 +27,20 @@ import android.graphics.PorterDuff;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 import android.view.View;
+import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.testing.screenshot.WindowAttachment;
+import com.facebook.testing.screenshot.layouthierarchy.AccessibilityHierarchyDumper;
+import com.facebook.testing.screenshot.layouthierarchy.AccessibilityIssuesDumper;
+import com.facebook.testing.screenshot.layouthierarchy.AccessibilityUtil;
 import com.facebook.testing.screenshot.layouthierarchy.LayoutHierarchyDumper;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Locale;
 import java.util.concurrent.Callable;
+import javax.annotation.Nullable;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * Implementation for Screenshot class.
@@ -44,14 +50,23 @@ import org.json.JSONException;
  *
  * <p>This is public only for implementation convenient for using UiThreadHelper.
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class ScreenshotImpl {
-  private static ScreenshotImpl sInstance;
+  /**
+   * The version of the metadata file generated. This should be bumped whenever the structure of the
+   * metadata file changes in such a way that would cause a comparison between old and new files to
+   * be invalid or not useful.
+   */
+  private static final int METADATA_VERSION = 1;
+
+  @Nullable private static ScreenshotImpl sInstance;
+
   /** The album of all the screenshots taken in this run. */
   private final Album mAlbum;
 
   private int mTileSize = 512;
-  private Bitmap mBitmap = null;
-  private Canvas mCanvas = null;
+  @Nullable private Bitmap mBitmap = null;
+  @Nullable private Canvas mCanvas = null;
   private boolean mEnableBitmapReconfigure = Build.VERSION.SDK_INT >= 19;
 
   ScreenshotImpl(Album album) {
@@ -81,6 +96,7 @@ public class ScreenshotImpl {
 
       Instrumentation instrumentation = Registry.getRegistry().instrumentation;
 
+      // NULLSAFE_FIXME[Not Vetted Third-Party]
       sInstance = create(instrumentation.getContext());
 
       return sInstance;
@@ -125,7 +141,7 @@ public class ScreenshotImpl {
           .setTestClass(TestNameDetector.getTestClass())
           .setTestName(TestNameDetector.getTestName());
     }
-    View rootView = activity.getWindow().getDecorView();
+    View rootView = Preconditions.checkNotNull(activity.getWindow()).getDecorView();
     return snap(rootView);
   }
 
@@ -217,12 +233,16 @@ public class ScreenshotImpl {
     lazyInitBitmap();
 
     if (mEnableBitmapReconfigure) {
-      mBitmap.reconfigure(right - left, bottom - top, Bitmap.Config.ARGB_8888);
+      Preconditions.checkNotNull(mBitmap)
+          .reconfigure(right - left, bottom - top, Bitmap.Config.ARGB_8888);
       mCanvas = new Canvas(mBitmap);
     }
+    // NULLSAFE_FIXME[Parameter Not Nullable]
     clearCanvas(mCanvas);
 
+    // NULLSAFE_FIXME[Parameter Not Nullable]
     drawClippedView(measuredView, left, top, mCanvas);
+    // NULLSAFE_FIXME[Parameter Not Nullable]
     String tempName = mAlbum.writeBitmap(recordBuilder.getName(), i, j, mBitmap);
     if (tempName == null) {
       throw new NullPointerException();
@@ -259,24 +279,28 @@ public class ScreenshotImpl {
   /** Records the RecordBuilderImpl, and verifies if required */
   public void record(RecordBuilderImpl recordBuilder) {
     storeBitmap(recordBuilder);
-    OutputStream viewHierarchyDump = null;
     try {
-      viewHierarchyDump = mAlbum.openViewHierarchyFile(recordBuilder.getName());
-      String dump =
-          LayoutHierarchyDumper.create().dumpHierarchy(recordBuilder.getView()).toString(2);
-      viewHierarchyDump.write(dump.getBytes());
-      viewHierarchyDump.flush();
+      JSONObject dump = new JSONObject();
+      JSONObject viewDump = LayoutHierarchyDumper.create().dumpHierarchy(recordBuilder.getView());
+      dump.put("viewHierarchy", viewDump);
+      dump.put("version", METADATA_VERSION);
+
+      AccessibilityUtil.AXTreeNode axTree =
+          recordBuilder.getIncludeAccessibilityInfo()
+              ? AccessibilityUtil.generateAccessibilityTree(recordBuilder.getView(), null)
+              : null;
+      dump.put("axHierarchy", AccessibilityHierarchyDumper.dumpHierarchy(axTree));
+      mAlbum.writeViewHierarchyFile(recordBuilder.getName(), dump.toString(2));
+
+      if (axTree != null) {
+        JSONObject issues = new JSONObject();
+        issues.put("axIssues", AccessibilityIssuesDumper.dumpIssues(axTree));
+        mAlbum.writeAxIssuesFile(recordBuilder.getName(), issues.toString(2));
+      }
+
       mAlbum.addRecord(recordBuilder);
     } catch (IOException | JSONException e) {
       throw new RuntimeException(e);
-    } finally {
-      if (viewHierarchyDump != null) {
-        try {
-          viewHierarchyDump.close();
-        } catch (IOException e) {
-          Log.e("ScreenshotImpl", "Exception closing viewHierarchyDump", e);
-        }
-      }
     }
   }
 
@@ -335,5 +359,12 @@ public class ScreenshotImpl {
       throw new RuntimeException(e[0]);
     }
     return ret[0];
+  }
+
+  /**
+   * @return The largest amount of pixels we'll capture, otherwise an exception will be thrown.
+   */
+  public static long getMaxPixels() {
+    return RecordBuilderImpl.DEFAULT_MAX_PIXELS;
   }
 }

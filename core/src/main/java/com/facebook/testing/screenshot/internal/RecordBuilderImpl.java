@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
 import android.graphics.Bitmap;
 import android.view.View;
+import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.testing.screenshot.RecordBuilder;
 import java.io.File;
 import java.nio.charset.Charset;
@@ -30,18 +32,28 @@ import java.util.Map;
  * <p>Use Screenshot#snap() or Screenshot#snapActivity() to get an instance of this, and commit the
  * record with #record().
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class RecordBuilderImpl implements RecordBuilder {
+  public static final long DEFAULT_MAX_PIXELS = 10000000L;
   private final ScreenshotImpl mScreenshotImpl;
   private final Map<String, String> mExtras = new HashMap<>();
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mDescription;
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mName;
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mTestClass;
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mTestName;
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mError;
+  // NULLSAFE_FIXME[Field Not Initialized]
   private String mGroup;
+  private boolean mIncludeAccessibilityInfo = true;
   private Tiling mTiling = new Tiling(1, 1);
+  // NULLSAFE_FIXME[Field Not Initialized]
   private View mView;
-  private long mMaxPixels = 10000000L;
+  private long mMaxPixels = DEFAULT_MAX_PIXELS;
 
   /* package */ RecordBuilderImpl(ScreenshotImpl screenshotImpl) {
     mScreenshotImpl = screenshotImpl;
@@ -51,7 +63,9 @@ public class RecordBuilderImpl implements RecordBuilder {
     return mDescription;
   }
 
-  /** @inherit */
+  /**
+   * @inherit
+   */
   @Override
   public RecordBuilderImpl setDescription(String description) {
     mDescription = description;
@@ -65,7 +79,9 @@ public class RecordBuilderImpl implements RecordBuilder {
     return mName;
   }
 
-  /** @inherit */
+  /**
+   * @inherit
+   */
   @Override
   public RecordBuilderImpl setName(String name) {
     CharsetEncoder charsetEncoder = Charset.forName("latin-1").newEncoder();
@@ -109,20 +125,26 @@ public class RecordBuilderImpl implements RecordBuilder {
     return this;
   }
 
-  /** @inherit */
+  /**
+   * @inherit
+   */
   @Override
   public Bitmap getBitmap() {
     return mScreenshotImpl.getBitmap(this);
   }
 
-  /** @inherit */
+  /**
+   * @inherit
+   */
   @Override
   public RecordBuilderImpl setMaxPixels(long maxPixels) {
     mMaxPixels = maxPixels;
     return this;
   }
 
-  /** @return The maximum number of pixels that is expected to be produced by this screenshot */
+  /**
+   * @return The maximum number of pixels that is expected to be produced by this screenshot
+   */
   public long getMaxPixels() {
     return mMaxPixels;
   }
@@ -145,7 +167,9 @@ public class RecordBuilderImpl implements RecordBuilder {
     return this;
   }
 
-  /** @inherit */
+  /**
+   * @inherit
+   */
   @Override
   public void record() {
     mScreenshotImpl.record(this);
@@ -202,5 +226,18 @@ public class RecordBuilderImpl implements RecordBuilder {
   public RecordBuilderImpl setGroup(String groupName) {
     mGroup = groupName;
     return this;
+  }
+
+  /**
+   * @inherit
+   */
+  @Override
+  public RecordBuilderImpl setIncludeAccessibilityInfo(boolean includeAccessibilityInfo) {
+    mIncludeAccessibilityInfo = includeAccessibilityInfo;
+    return this;
+  }
+
+  public boolean getIncludeAccessibilityInfo() {
+    return mIncludeAccessibilityInfo;
   }
 }

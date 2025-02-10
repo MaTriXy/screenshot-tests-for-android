@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
 import static com.facebook.testing.screenshot.ScreenshotRunner.SDCARD_DIRECTORY;
@@ -24,6 +25,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import com.facebook.infer.annotation.Nullsafe;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -31,6 +33,7 @@ import java.io.InputStream;
 import java.util.Locale;
 
 /** Provides a directory for an Album to store its screenshots in. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 class ScreenshotDirectories {
   // Constants used to alleviate potential API level conflicts
   private static final String WRITE_PERMISSION = "android.permission.WRITE_EXTERNAL_STORAGE";
@@ -63,6 +66,7 @@ class ScreenshotDirectories {
       if (Build.VERSION.SDK_INT < 23) {
         throw new RuntimeException("We need " + permission + " permission for screenshot tests");
       }
+      // NULLSAFE_FIXME[Not Vetted Third-Party]
       Context targetContext = Registry.getRegistry().instrumentation.getTargetContext();
       grantPermission(targetContext, permission);
       grantPermission(mContext, permission);
@@ -73,9 +77,11 @@ class ScreenshotDirectories {
     if (Build.VERSION.SDK_INT < 23) {
       return;
     }
+    // NULLSAFE_FIXME[Not Vetted Third-Party]
     UiAutomation automation = Registry.getRegistry().instrumentation.getUiAutomation();
     String command =
         String.format(Locale.ENGLISH, "pm grant %s %s", context.getPackageName(), permission);
+    // NULLSAFE_FIXME[Not Vetted Third-Party]
     ParcelFileDescriptor pfd = automation.executeShellCommand(command);
     InputStream stream = new FileInputStream(pfd.getFileDescriptor());
     try {
@@ -134,6 +140,6 @@ class ScreenshotDirectories {
   private void setWorldWriteable(File dir) {
     // Context.MODE_WORLD_WRITEABLE has been deprecated, so let's
     // manually set this
-    dir.setWritable(/* writeable = */ true, /* ownerOnly = */ false);
+    dir.setWritable(/* writeable= */ true, /* ownerOnly= */ false);
   }
 }

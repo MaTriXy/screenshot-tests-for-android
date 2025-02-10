@@ -1,7 +1,9 @@
-load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
+load("@fbsource//tools/build_defs:fb_python_library.bzl", "fb_python_library")
 
-fb_native.python_library(
-    name = "screenshot_tests",
-    srcs = glob(["**/*.py"]),
+fb_python_library(
+    name = "android_screenshot_tests",
+    srcs = glob(["android_screenshot_tests/**/*.py"]),
+    base_module = "",
     visibility = ["PUBLIC"],
+    deps = ["//third-party/pypi/pillow:pillow"],
 )

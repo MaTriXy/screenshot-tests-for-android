@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot;
 
 import static android.view.View.MeasureSpec.makeMeasureSpec;
@@ -25,6 +26,7 @@ import android.view.View;
 import android.view.View.MeasureSpec;
 import android.view.ViewGroup;
 import android.widget.ListView;
+import com.facebook.infer.annotation.Nullsafe;
 
 /**
  * A collection of static utilities for measuring and pre-drawing a view, usually a pre-requirement
@@ -37,6 +39,7 @@ import android.widget.ListView;
  *     .layout();
  * </code>
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class ViewHelpers {
   private static final int HEIGHT_LIMIT = 100000;
 
@@ -141,6 +144,30 @@ public class ViewHelpers {
   /** Configure the width in dip */
   public ViewHelpers setExactHeightDp(int dp) {
     setExactHeightPx(dpToPx(dp));
+    return this;
+  }
+
+  /** Configure the height in pixels */
+  public ViewHelpers setMaxHeightPx(int px) {
+    mHeightMeasureSpec = makeMeasureSpec(px, MeasureSpec.AT_MOST);
+    return this;
+  }
+
+  /** Configure the height in dip */
+  public ViewHelpers setMaxHeightDp(int dp) {
+    setMaxHeightPx(dpToPx(dp));
+    return this;
+  }
+
+  /** Configure the with in pixels */
+  public ViewHelpers setMaxWidthPx(int px) {
+    mWidthMeasureSpec = makeMeasureSpec(px, MeasureSpec.AT_MOST);
+    return this;
+  }
+
+  /** Configure the width in dip */
+  public ViewHelpers setMaxWidthDp(int dp) {
+    setMaxWidthPx(dpToPx(dp));
     return this;
   }
 

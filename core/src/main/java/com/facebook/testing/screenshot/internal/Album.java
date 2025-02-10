@@ -1,11 +1,11 @@
 /*
- * Copyright 2014-present Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.testing.screenshot.internal;
 
 import android.graphics.Bitmap;
 import java.io.IOException;
-import java.io.OutputStream;
 
 /** Stores metadata about an album of screenshots during an instrumentation test run. */
 public interface Album {
@@ -40,7 +40,15 @@ public interface Album {
    *
    * <p>It is the callers responsibility to call {@code close()} on the returned stream.
    */
-  OutputStream openViewHierarchyFile(String name) throws IOException;
+  void writeViewHierarchyFile(String name, String data) throws IOException;
+
+  /**
+   * Opens a stream to dump the accessibility issues into. This should be called before addRecord()
+   * is called for the given name.
+   *
+   * <p>It is the callers responsibility to call {@code close()} on the returned stream.
+   */
+  void writeAxIssuesFile(String name, String data) throws IOException;
 
   /** This is called after every record is finally set up. */
   void addRecord(RecordBuilderImpl recordBuilder) throws IOException;
